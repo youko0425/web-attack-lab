@@ -55,7 +55,7 @@ function initSqli() {
   function reset() {
     users = [
       { id: 1, u: "ADMIN", p: "admin001", admin: true },
-      { id: 2, u: "pony", p: "password", admin: false }
+      { id: 2, u: "elaine", p: "password", admin: false }
     ];
     nextId = 3;
     render();

