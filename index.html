@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESAM WEB ATTACK LAB</title>
+<meta name="description" content="ESAM Web 攻防實戰 Lab 教學站：SQL Injection、XSS、SSTI 三個靶機的原理、操作步驟與可直接複製的 payload。">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="nav">
+  <div class="brand">ESAM<span>//</span>WEB_ATTACK_LAB</div>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="lab1-sqli.html">01 SQLi</a>
+    <a href="lab2-xss.html">02 XSS</a>
+    <a href="lab3-ssti.html">03 SSTI</a>
+  </div>
+</nav>
+
+<main class="wrap">
+  <div class="kicker">// WEB ATTACK LAB</div>
+  <h1 class="title">以攻代守 Web 攻防實戰</h1>
+  <p class="lead">本站整理 ESAM「AI 資安進駐 Web 攻防」課程的三組靶機。每一頁說明漏洞成因、靶機環境、現場操作步驟，並附上可直接複製的攻擊 payload 與修補寫法，供學員在課堂上同步演練。</p>
+
+  <div class="panel">
+    <span class="tag">Core Concept</span>
+    <p style="margin:0">三個 Lab 指向同一個根本問題：<strong>「資料」與「程式碼」沒有分離</strong>。使用者的輸入被伺服器當成程式碼執行。SQLi 讓輸入被當成 SQL 指令，XSS 讓輸入在他人瀏覽器被當成 JavaScript，SSTI 讓輸入被當成模板語法，最終在伺服器上執行系統指令。</p>
+  </div>
+
+  <h2>選擇你的 Lab</h2>
+  <p class="lead">選擇實驗直接進入。每個 Lab 的指令與 payload 皆可一鍵複製，照頁面步驟即可完成演練。</p>
+  <div class="grid">
+    <a class="card" href="lab1-sqli.html">
+      <span class="tag">Lab 01</span>
+      <div class="name">SQL Injection</div>
+      <div class="desc">輸入被拼進 SQL 查詢字串，繞過登入並竄改資料庫。</div>
+      <div class="meta"><span class="badge high">High</span> &nbsp; PORT 5000</div>
+    </a>
+    <a class="card" href="lab2-xss.html">
+      <span class="tag">Lab 02</span>
+      <div class="name">XSS + Session Hijacking</div>
+      <div class="desc">惡意留言在受害者瀏覽器執行，竊取 cookie 並冒用身分。</div>
+      <div class="meta"><span class="badge high">High</span> &nbsp; PORT 5001 / 4444</div>
+    </a>
+    <a class="card" href="lab3-ssti.html">
+      <span class="tag">Lab 03</span>
+      <div class="name">SSTI to RCE</div>
+      <div class="desc">輸入被模板引擎解析，由注入語法升級為遠端指令執行。</div>
+      <div class="meta"><span class="badge high">High</span> &nbsp; PORT 5002</div>
+    </a>
+  </div>
+
+  <h2>使用方式</h2>
+  <div class="note">
+    <span class="label">How to use</span>
+    每個 Lab 頁面的指令區塊右上角都有 <strong>COPY</strong> 按鈕，點一下即可複製整段，直接貼到瀏覽器網址列、輸入框或終端機。靶機網址（trycloudflare）每次開課重新產生，上課時由講師現場公告，請把頁面範例中的 <code>&lt;靶機網址&gt;</code> 換成當天的實際網址。
+  </div>
+
+  <div class="note warn">
+    <span class="label">使用規範</span>
+    本站所有技術僅供課堂授權環境內的攻防演練。請勿對未授權之系統進行測試。課堂操作時不要執行破壞性指令（例如刪除資料、更改密碼），以免影響其他學員。
+  </div>
+</main>
+
+<footer class="foot">ESAM 社團法人台灣E化資安分析管理協會 &nbsp;//&nbsp; Web 攻防實戰 Lab</footer>
+<script src="app.js"></script>
+</body>
+</html>
