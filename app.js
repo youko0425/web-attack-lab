@@ -172,14 +172,36 @@ function initXss() {
     o.innerHTML = html;
   }
 
+  // vulnerable 模式下，真的讓留言中的腳本在瀏覽器執行（Stored XSS 實演）
+  // 竊取 cookie 類不真的送網路，交給模擬 Collector，避免對外請求
+  function execPayload(m) {
+    if (isSteal(m)) return;
+    try {
+      var holder = document.createElement("div");
+      holder.style.display = "none";
+      document.body.appendChild(holder);
+      holder.innerHTML = m;                 // 觸發 inline 事件處理器，如 img onerror
+      holder.querySelectorAll("script").forEach(function (s) {
+        try { window.eval(s.textContent || ""); } catch (e) {}
+      });
+      setTimeout(function () { holder.remove(); }, 1500);
+    } catch (e) {}
+  }
+
   function post() {
     var m = document.getElementById("xss-msg").value;
     if (!m.trim()) return;
     board.unshift({ uid: current, m: m });
     renderBoard();
     if (isScript(m)) {
-      if (protect()) out("ok", "Protected 模式：留言在輸出前做 HTML 編碼，&lt;script&gt; 變成純文字顯示，不會執行。");
-      else out("bad", "留言已存入，且含有腳本。接著按「模擬 victim 開啟留言板」，讓受害者在自己的瀏覽器觸發它。");
+      if (protect()) {
+        out("ok", "Protected 模式：留言在輸出前做 HTML 編碼，&lt;script&gt; 變成純文字顯示，不會執行。");
+      } else if (isSteal(m)) {
+        out("bad", "留言已存入，含有竊取 cookie 的腳本。接著按「模擬 victim 開啟留言板」，讓受害者在自己的瀏覽器觸發它。");
+      } else {
+        execPayload(m);
+        out("bad", "留言已存入，且立即在你的瀏覽器執行，你應該看到彈窗。這就是 Stored XSS：留言被當成程式碼執行。");
+      }
     } else {
       out("info", "留言已存入。這則不含腳本，屬於正常留言。");
     }
@@ -187,17 +209,19 @@ function initXss() {
   }
 
   function victimVisit() {
+    if (protect()) { out("ok", "Protected 模式下，受害者瀏覽留言板時腳本被當純文字顯示，沒有任何腳本執行，cookie 未外洩。"); return; }
+    // 受害者的瀏覽器真的執行留言中的腳本
+    board.forEach(function (x) { if (isScript(x.m)) execPayload(x.m); });
     var hasSteal = board.some(function (x) { return isSteal(x.m); });
     var hasScript = board.some(function (x) { return isScript(x.m); });
-    if (protect()) { out("ok", "Protected 模式下，受害者瀏覽留言板時腳本被當純文字顯示，沒有任何腳本執行，cookie 未外洩。"); return; }
     if (hasSteal) {
       if (!stolen.some(function (s) { return s.sid === victim.sid; })) stolen.push({ t: now(), user: victim.user, sid: victim.sid, cookie: victim.cookie });
       renderStolen();
       out("bad", "受害者 victim 開啟留言板，惡意腳本在其瀏覽器執行，讀取 document.cookie 後送往攻擊者的 Collector。Collector 已收到 victim 的 cookie。接著複製 session_id，到下方冒用身分。");
     } else if (hasScript) {
-      out("bad", "受害者瀏覽器執行了留言中的腳本（例如彈窗）。把它換成竊取 cookie 的 fetch，就能偷走 session。");
+      out("bad", "受害者瀏覽器執行了留言中的腳本，你應該看到彈窗。把它換成竊取 cookie 的 fetch，就能偷走 session。");
     } else {
-      out("info", "目前留言都沒有腳本，受害者瀏覽後沒有任何事發生。先發一則竊取 cookie 的留言。");
+      out("info", "目前留言都沒有腳本，受害者瀏覽後沒有任何事發生。先發一則腳本留言。");
     }
   }
 
