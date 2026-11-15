@@ -51,21 +51,23 @@ document.addEventListener("DOMContentLoaded", function () {
 function initSqli() {
   var root = document.getElementById("sqli-sim");
   if (!root) return;
-  var users;
+  var users, nextId;
   function reset() {
     users = [
-      { u: "ADMIN", p: "admin001", admin: true },
-      { u: "pony", p: "password", admin: false }
+      { id: 1, u: "ADMIN", p: "admin001", admin: true },
+      { id: 2, u: "pony", p: "password", admin: false }
     ];
+    nextId = 3;
     render();
     out("", "");
   }
   function render() {
     var rows = users.map(function (x) {
-      return "<tr><td>" + esc(x.u) + "</td><td>" + esc(x.p) + "</td><td class=center>" + (x.admin ? "1" : "0") + "</td></tr>";
+      return "<tr><td>" + x.id + "</td><td>" + esc(x.u) + "</td><td>" + esc(x.p) + "</td><td class=center>" + (x.admin ? "1" : "0") + "</td></tr>";
     }).join("");
     document.getElementById("sqli-table").innerHTML =
-      "<table class=sim-table><tr><th>username</th><th>password</th><th class=center>isAdmin</th></tr>" + rows + "</table>";
+      "<table class=sim-table><tr><th>id</th><th>username</th><th>password</th><th class=center>isAdmin</th></tr>" + rows + "</table>" +
+      "<div class=sim-note>共 " + users.length + " 筆。注入後回看這張表，就能確認資料被新增、提權或刪除。</div>";
   }
   function out(cls, html) {
     var o = document.getElementById("sqli-out");
@@ -88,7 +90,7 @@ function initSqli() {
       var s = seg.trim(); if (!s || s.indexOf("--") === 0) return;
       var m;
       if (m = s.match(/insert\s+into\s+users\s*\([^)]*\)\s*values\s*\(\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*(\d+)/i)) {
-        users.push({ u: m[1], p: m[2], admin: m[3] === "1" }); changed = true;
+        users.push({ id: nextId++, u: m[1], p: m[2], admin: m[3] === "1" }); changed = true;
         msgs.push("INSERT 成功。新增使用者 " + esc(m[1]) + "，isAdmin=" + m[3] + "。");
       } else if (m = s.match(/update\s+users\s+set\s+isadmin\s*=\s*(\d+)\s+where\s+username\s*=\s*'([^']*)'/i)) {
         var t = users.find(function (x) { return x.u.toLowerCase() === m[2].toLowerCase(); });
