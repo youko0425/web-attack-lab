@@ -193,6 +193,16 @@ td.center, th.center { text-align: center; }
 .btn.ghost:hover { background: var(--accent-soft); }
 .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
+/* XSS Collector 終端機樣式 */
+.xss-term {
+  background: #0a0f0a; color: #33ff33;
+  font-family: var(--mono); font-size: 13px; line-height: 1.9;
+  padding: 14px 16px; border-radius: 8px; margin-top: 8px;
+  border: 1px solid #1e3a1e; word-break: break-all;
+}
+.xss-term .use { background: #0a0f0a; color: #33ff33; border-color: #2f7f2f; margin-left: 6px; }
+.xss-term .use:hover { background: #063006; }
+
 /* 模擬輸出 */
 .sim-out { margin-top: 16px; border-radius: 8px; padding: 12px 14px; font-size: 14px; display: none; }
 .sim-out.show { display: block; }

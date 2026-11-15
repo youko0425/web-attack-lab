@@ -117,51 +117,109 @@ function initSqli() {
   reset();
 }
 
-/* ---------- Lab 2 XSS 留言板 ---------- */
+/* ---------- Lab 2 XSS 留言板 + Session Hijacking ---------- */
 function initXss() {
   var root = document.getElementById("xss-sim");
   if (!root) return;
-  var board = [], stolen = [];
-  var victimCookie = "session_id=demo-7f3a9b; session_user=victim";
+  var me = "claude_test";
+  var current, board, stolen;
+  var victim = {
+    user: "victim",
+    sid: "sess-victim-8f3a9b",
+    cookie: "session_id=sess-victim-8f3a9b; session_user=victim; fake_session=20251202-Demo-session-cookie"
+  };
+  function isSteal(m) {
+    return /<script[^>]*>[\s\S]*?(fetch|document\.cookie|steal)/i.test(m) || /on\w+\s*=[^>]*(fetch|cookie)/i.test(m);
+  }
+  function isScript(m) {
+    return /<script|on\w+\s*=|<svg|<img/i.test(m);
+  }
+  function protect() { return document.getElementById("xss-protect").checked; }
+
+  function renderUser() {
+    var hijacked = current === victim.user;
+    document.getElementById("xss-user").innerHTML =
+      "目前登入使用者：<strong>" + esc(current) + "</strong>" +
+      (hijacked ? " <span class='badge high'>已冒用受害者身分</span>" : "");
+  }
   function renderBoard() {
-    var protect = document.getElementById("xss-protect").checked;
-    document.getElementById("xss-board").innerHTML = board.length ? board.map(function (m) {
-      var body = protect ? esc(m) : ("<span class=mono>" + esc(m) + "</span>");
-      return "<div class=panel style='margin:8px 0;padding:12px 14px'><div class=pl-label>匿名留言</div>" + body + "</div>";
+    var p = protect();
+    document.getElementById("xss-board").innerHTML = board.length ? board.map(function (msg) {
+      var tag = "";
+      if (!p && isScript(msg.m)) tag = "<div class=pl-label style='color:#c23b4b'>此留言含腳本，任何瀏覽本頁的使用者都會執行它</div>";
+      else if (p && isScript(msg.m)) tag = "<div class=pl-label style='color:#2f8f5b'>已 HTML 編碼，腳本不執行</div>";
+      var body = "<span class=mono>" + esc(msg.m) + "</span>";
+      return "<div class='panel' style='margin:8px 0;padding:12px 14px'><div class=pl-label>" + esc(msg.uid) + "：</div>" + body + tag + "</div>";
     }).join("") : "<div class=sim-note>目前沒有留言。</div>";
   }
   function renderStolen() {
-    document.getElementById("xss-collector").innerHTML = stolen.length ?
-      "<table class=sim-table><tr><th>時間</th><th>竊得的 cookie</th></tr>" +
-      stolen.map(function (s) { return "<tr><td>" + s.t + "</td><td class=mono>" + esc(s.c) + "</td></tr>"; }).join("") + "</table>"
-      : "<div class=sim-note>尚未收到任何 cookie。</div>";
+    var el = document.getElementById("xss-collector");
+    if (!stolen.length) { el.innerHTML = "<div class='xss-term'>Cookie Collector<br><span style='opacity:.6'>尚未收到任何 cookie。</span></div>"; return; }
+    el.innerHTML = "<div class='xss-term'>Cookie Collector<br>" + stolen.map(function (s) {
+      return "[" + s.t + "] 10.0.0.9 (" + esc(s.user) + ") &rarr; " + esc(s.cookie) +
+        " <button class='use' data-target='xss-sid' data-value='" + s.sid + "'>複製 session_id</button>";
+    }).join("<br>") + "</div>";
+    // 新加的「複製 session_id」按鈕要補綁定
+    el.querySelectorAll(".use[data-target]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        document.getElementById(b.getAttribute("data-target")).value = b.getAttribute("data-value");
+      });
+    });
   }
   function out(cls, html) {
     var o = document.getElementById("xss-out");
     o.className = "sim-out" + (cls ? " show " + cls : "");
     o.innerHTML = html;
   }
+
   function post() {
     var m = document.getElementById("xss-msg").value;
     if (!m.trim()) return;
-    var protect = document.getElementById("xss-protect").checked;
-    board.push(m);
+    board.unshift({ uid: current, m: m });
     renderBoard();
-    if (protect) {
-      out("ok", "Protected 模式：留言在輸出前做了 HTML 編碼，&lt;script&gt; 變成純文字顯示，腳本不會執行。");
-    } else if (/<script[^>]*>[\s\S]*?(fetch|document\.cookie|steal)/i.test(m) || /on\w+\s*=\s*[^>]*(fetch|cookie)/i.test(m)) {
-      stolen.push({ t: now(), c: victimCookie });
-      renderStolen();
-      out("bad", "惡意腳本在受害者瀏覽器執行，讀取 document.cookie 後送往攻擊者的 Collector。下方 Collector 已收到受害者的 cookie，攻擊者可用它冒用身分。");
-    } else if (/<script[^>]*>[\s\S]*?alert/i.test(m) || /on\w+\s*=/i.test(m) || /<svg|<img/i.test(m)) {
-      out("bad", "彈窗觸發：留言中的 JavaScript 被執行，代表存在 Stored XSS。把 alert 換成竊取 cookie 的程式碼即可偷走 session。");
+    if (isScript(m)) {
+      if (protect()) out("ok", "Protected 模式：留言在輸出前做 HTML 編碼，&lt;script&gt; 變成純文字顯示，不會執行。");
+      else out("bad", "留言已存入，且含有腳本。接著按「模擬 victim 開啟留言板」，讓受害者在自己的瀏覽器觸發它。");
     } else {
       out("info", "留言已存入。這則不含腳本，屬於正常留言。");
     }
     document.getElementById("xss-msg").value = "";
   }
-  function reset() { board = []; stolen = []; renderBoard(); renderStolen(); out("", ""); }
+
+  function victimVisit() {
+    var hasSteal = board.some(function (x) { return isSteal(x.m); });
+    var hasScript = board.some(function (x) { return isScript(x.m); });
+    if (protect()) { out("ok", "Protected 模式下，受害者瀏覽留言板時腳本被當純文字顯示，沒有任何腳本執行，cookie 未外洩。"); return; }
+    if (hasSteal) {
+      if (!stolen.some(function (s) { return s.sid === victim.sid; })) stolen.push({ t: now(), user: victim.user, sid: victim.sid, cookie: victim.cookie });
+      renderStolen();
+      out("bad", "受害者 victim 開啟留言板，惡意腳本在其瀏覽器執行，讀取 document.cookie 後送往攻擊者的 Collector。Collector 已收到 victim 的 cookie。接著複製 session_id，到下方冒用身分。");
+    } else if (hasScript) {
+      out("bad", "受害者瀏覽器執行了留言中的腳本（例如彈窗）。把它換成竊取 cookie 的 fetch，就能偷走 session。");
+    } else {
+      out("info", "目前留言都沒有腳本，受害者瀏覽後沒有任何事發生。先發一則竊取 cookie 的留言。");
+    }
+  }
+
+  function hijack() {
+    var sid = document.getElementById("xss-sid").value.trim();
+    if (sid === victim.sid) {
+      current = victim.user;
+      renderUser(); renderBoard();
+      out("bad", "成功冒用身分。把竊得的 session_id 當成自己的 cookie 後，伺服器把你認成 victim，目前登入使用者已變為 victim。這就是 Session Hijacking。");
+    } else {
+      out("info", "這個 session_id 不存在，無法冒用。請從 Collector 複製竊得的 session_id。");
+    }
+  }
+
+  function reset() {
+    current = me; board = []; stolen = [];
+    document.getElementById("xss-sid").value = "";
+    renderUser(); renderBoard(); renderStolen(); out("", "");
+  }
   document.getElementById("xss-post").addEventListener("click", post);
+  document.getElementById("xss-victim").addEventListener("click", victimVisit);
+  document.getElementById("xss-hijack").addEventListener("click", hijack);
   document.getElementById("xss-reset").addEventListener("click", reset);
   document.getElementById("xss-protect").addEventListener("change", renderBoard);
   reset();

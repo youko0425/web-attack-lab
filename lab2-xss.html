@@ -29,15 +29,17 @@
   <p>留言內容未經編碼即插入 HTML，屬於 <strong>Stored XSS</strong>：惡意腳本存進資料庫後長期存在，之後每一位看到該留言的使用者，瀏覽器都會執行它。靶機並刻意讓 cookie 可被 JavaScript 讀取（<code>document.cookie</code>），這是竊取 cookie 的前提。腳本讀到 cookie 後，以 <code>fetch</code> 送往攻擊者的 Collector，攻擊者即可用它冒用身分。</p>
 
   <h2>模擬練習</h2>
-  <p class="lead">在下面的留言板發表留言。勾掉 Protected 時為有漏洞狀態；發出含腳本的留言，觀察 Collector 是否收到受害者 cookie。勾選 Protected 後再發一次，比較差異。</p>
+  <p class="lead">完整走一次攻擊鏈：發一則竊取 cookie 的留言，讓受害者瀏覽留言板觸發它，在 Collector 看到偷來的 cookie，再把它貼回去冒用受害者身分。勾選 Protected 後重做，比較差異。</p>
 
   <div class="sim" id="xss-sim">
     <span class="sim-tag">留言板</span>
-    <h3>留言板</h3>
-    <label for="xss-msg">留言內容</label>
-    <textarea id="xss-msg" spellcheck="false" placeholder="輸入留言或貼上 payload"></textarea>
+    <h3>XSS 留言板</h3>
+    <div id="xss-user" class="sim-note" style="font-size:14px;margin-top:0"></div>
+    <label for="xss-msg">發表留言</label>
+    <textarea id="xss-msg" spellcheck="false" placeholder="想說什麼呢？或貼上 payload"></textarea>
     <div class="btn-row">
-      <button class="btn" id="xss-post">發表留言</button>
+      <button class="btn" id="xss-post">送出留言</button>
+      <button class="btn ghost" id="xss-victim">模擬 victim 開啟留言板</button>
       <button class="btn ghost" id="xss-reset">清空</button>
       <label style="display:flex;align-items:center;gap:6px;margin:14px 0 0;font-weight:600">
         <input type="checkbox" id="xss-protect"> Protected（輸出編碼）
@@ -62,9 +64,16 @@
 
     <h3>留言列表</h3>
     <div id="xss-board"></div>
+
     <h3>攻擊者 Collector</h3>
     <div id="xss-collector"></div>
-    <div class="sim-note">模擬受害者 cookie：session_id=demo-7f3a9b。所有效果皆為頁面內模擬，不會真的發出請求。</div>
+
+    <h3>冒用身分（Session Hijacking）</h3>
+    <p class="sim-note" style="margin-top:0">從 Collector 複製竊得的 session_id 貼到這裡，套用後伺服器就把你認成受害者。</p>
+    <input type="text" id="xss-sid" autocomplete="off" spellcheck="false" placeholder="貼上竊得的 session_id">
+    <div class="btn-row"><button class="btn" id="xss-hijack">套用 session_id</button></div>
+
+    <div class="sim-note">受害者的 cookie：fake_session=20251202-Demo-session-cookie（刻意設為可被 JavaScript 讀取）。所有效果皆為頁面內模擬，不會真的發出請求。</div>
   </div>
 
   <h2>防禦修補</h2>
